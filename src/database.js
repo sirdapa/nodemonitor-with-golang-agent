@@ -14,6 +14,22 @@ const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 const { DB_PATH, MAX_HISTORY } = require('./config');
+const auth = require('./auth');
+
+/**
+ * Default password untuk login dashboard pertama kali.
+ * User akan dipaksa mengganti password setelah login pertama.
+ * @type {string}
+ */
+const DEFAULT_PASSWORD = '123456';
+
+/**
+ * Key untuk tabel settings.
+ */
+const SETTINGS = {
+  PASSWORD_HASH: 'password_hash',
+  MUST_CHANGE: 'must_change_password',
+};
 
 /**
  * Koneksi database SQLite (synchronous API via node:sqlite).
@@ -140,6 +156,11 @@ function initDatabase() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_history_host ON history(hostname, id);
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
 
   // --- Prepared statements (node:sqlite uses positional ? params) -----
@@ -174,7 +195,15 @@ function initDatabase() {
         )
     `),
     setOffline: db.prepare('UPDATE servers SET online = 0 WHERE hostname = ?'),
+    getSetting: db.prepare('SELECT value FROM settings WHERE key = ?'),
+    setSetting: db.prepare(`
+      INSERT INTO settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `),
   };
+
+  // --- Seed default credentials (hanya saat pertama kali) -------------------
+  seedDefaultAuth();
 
   // --- Load semua server dari DB ------------------------------------------
   const rows = db.prepare('SELECT * FROM servers').all();
@@ -256,6 +285,42 @@ function setOfflineInDb(hostname) {
 }
 
 /**
+ * Seed kredensial default saat database pertama kali dibuat:
+ *   - hash password default (123456)
+ *   - flag must_change_password = '1' (paksa ganti password pertama login)
+ *
+ * @returns {void}
+ */
+function seedDefaultAuth() {
+  const existing = stmts.getSetting.get(SETTINGS.PASSWORD_HASH);
+  if (existing) return; // sudah pernah di-seed / diubah
+  stmts.setSetting.run(SETTINGS.PASSWORD_HASH, auth.hashPassword(DEFAULT_PASSWORD));
+  stmts.setSetting.run(SETTINGS.MUST_CHANGE, '1');
+}
+
+/**
+ * Ambil nilai setting berdasarkan key.
+ *
+ * @param {string} key
+ * @returns {string|null}
+ */
+function getSetting(key) {
+  const row = stmts.getSetting.get(key);
+  return row ? row.value : null;
+}
+
+/**
+ * Simpan / update nilai setting.
+ *
+ * @param {string} key
+ * @param {string} value
+ * @returns {void}
+ */
+function setSetting(key, value) {
+  stmts.setSetting.run(key, value);
+}
+
+/**
  * Tutup koneksi database.
  *
  * @returns {void}
@@ -271,4 +336,8 @@ module.exports = {
   deleteServerFromDb,
   setOfflineInDb,
   closeDatabase,
+  seedDefaultAuth,
+  getSetting,
+  setSetting,
+  SETTINGS,
 };

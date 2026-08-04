@@ -77,6 +77,12 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         <span id="lastRefresh" class="text-xs text-gray-500 hidden sm:inline"></span>
         <span id="refreshDot" class="w-2 h-2 rounded-full bg-green-500 pulse-online"></span>
         <span class="text-xs text-gray-400">Live</span>
+        <form method="POST" action="/logout" class="ml-1">
+          <button type="submit" title="Logout"
+            class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
+            Logout
+          </button>
+        </form>
       </div>
     </div>
   </header>
