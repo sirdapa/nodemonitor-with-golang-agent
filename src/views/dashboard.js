@@ -77,6 +77,14 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         <span id="lastRefresh" class="text-xs text-gray-500 hidden sm:inline"></span>
         <span id="refreshDot" class="w-2 h-2 rounded-full bg-green-500 pulse-online"></span>
         <span class="text-xs text-gray-400">Live</span>
+        <div class="hidden md:flex items-center gap-2 ml-1">
+          <span class="text-xs text-gray-500">Token:</span>
+          <code id="agentToken" class="text-xs text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1 font-mono select-all">__AGENT_TOKEN__</code>
+          <button id="copyToken" type="button" title="Salin token agent"
+            class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
+            Salin
+          </button>
+        </div>
         <form method="POST" action="/logout" class="ml-1">
           <button type="submit" title="Logout"
             class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
@@ -659,6 +667,23 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') closeModal();
     });
+
+    // Salin token agent ke clipboard.
+    var copyBtn = document.getElementById('copyToken');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var token = document.getElementById('agentToken').textContent;
+        var done = function () {
+          copyBtn.textContent = 'Tersalin!';
+          setTimeout(function () { copyBtn.textContent = 'Salin'; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(token).then(done).catch(done);
+        } else {
+          done();
+        }
+      });
+    }
 
     /* ----------------------- Init ----------------------- */
 
