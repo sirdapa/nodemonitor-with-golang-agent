@@ -7,7 +7,7 @@
     "start": "node --experimental-sqlite index.js",
     "dev": "node --experimental-sqlite index.js",
     "agent": "node --experimental-sqlite agent.js",
-    "tunnel": "cloudflared tunnel --url http://localhost:${PORT:-3000} --no-autoupdate"
+    "tunnel": "cloudflared tunnel --url http://127.0.0.1:${PORT:-3000} --no-autoupdate"
   },
   "keywords": [
     "monitoring",

@@ -39,7 +39,7 @@ function escapeHtml(s) {
  */
 router.get('/', dashboardLimiter, ensureAuth, (req, res) => {
   res.type('html');
-  res.send(DASHBOARD_HTML.replace('__AGENT_TOKEN__', escapeHtml(AUTH_TOKEN)));
+  res.send(DASHBOARD_HTML.replace(/__AGENT_TOKEN__/g, escapeHtml(AUTH_TOKEN)));
 });
 
 module.exports = router;
