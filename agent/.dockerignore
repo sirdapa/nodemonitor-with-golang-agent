@@ -1,0 +1,15 @@
+# Build artifacts
+node-monitor-agent
+node-monitor-agent.exe
+*.exe
+
+# Go workspace
+vendor/
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore

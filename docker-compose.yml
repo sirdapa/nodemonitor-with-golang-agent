@@ -1,0 +1,79 @@
+# ============================================================================
+# docker-compose.yml — Node Monitor (Dashboard + Agent)
+# ----------------------------------------------------------------------------
+# Menjalankan dashboard monitoring dan satu atau lebih agent Go.
+#
+# Cara pakai:
+#   docker compose up -d              # start semua
+#   docker compose up -d monitor      # start dashboard saja
+#   docker compose up -d agent        # start agent saja
+#   docker compose logs -f monitor    # lihat log dashboard
+#   docker compose down               # stop semua
+#
+# Untuk menambah agent baru, copy block service "agent" dan ubah
+# hostname-nya. Lihat contoh "agent-02" di bawah (commented).
+# ============================================================================
+
+services:
+  # --- Dashboard Server ----------------------------------------------------
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: node-monitor
+    ports:
+      - "${MONITOR_PORT:-3000}:3000"
+    volumes:
+      # Persist SQLite database ke host agar data tidak hilang saat container dihapus.
+      - monitor-data:/app/data
+    environment:
+      - PORT=3000
+      - TOKEN=${TOKEN:-changeme}
+      - DB_PATH=/app/data/monitor.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # --- Agent 01 ------------------------------------------------------------
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: node-monitor-agent-01
+    environment:
+      - DASHBOARD_URL=http://monitor:3000
+      - TOKEN=${TOKEN:-changeme}
+      - HOSTNAME=agent-01
+      - INTERVAL_SEC=10
+      - TIMEOUT_SEC=5
+    depends_on:
+      monitor:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --- Agent 02 (contoh agent tambahan) -----------------------------------
+  # Uncomment untuk menjalankan agent kedua dengan hostname berbeda.
+  # agent-02:
+  #   build:
+  #     context: ./agent
+  #     dockerfile: Dockerfile
+  #   container_name: node-monitor-agent-02
+  #   environment:
+  #     - DASHBOARD_URL=http://monitor:3000
+  #     - TOKEN=${TOKEN:-changeme}
+  #     - HOSTNAME=agent-02
+  #     - INTERVAL_SEC=10
+  #     - TIMEOUT_SEC=5
+  #   depends_on:
+  #     monitor:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+# --- Volumes ---------------------------------------------------------------
+volumes:
+  monitor-data:
+    # Persisted SQLite database untuk dashboard.

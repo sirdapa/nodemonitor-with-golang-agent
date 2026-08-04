@@ -1,0 +1,27 @@
+{
+  "name": "node-monitor",
+  "version": "1.0.0",
+  "description": "Lightweight VPS monitoring dashboard with SQLite persistence",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --experimental-sqlite index.js",
+    "dev": "node --experimental-sqlite index.js",
+    "agent": "node --experimental-sqlite agent.js"
+  },
+  "keywords": [
+    "monitoring",
+    "vps",
+    "dashboard",
+    "uptime",
+    "server"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0"
+  }
+}
