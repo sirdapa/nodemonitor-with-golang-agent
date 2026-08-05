@@ -174,15 +174,15 @@ function processReport(body, ip) {
 
   if (existing) {
     updateRecord(existing, body, ip);
-    pushHistory(existing, body);
     db.saveServer(existing);
+    pushHistory(existing, body);
     return { ok: true, action: 'updated', hostname };
   }
 
   const rec = createRecord(body, ip);
-  pushHistory(rec, body);
   servers.set(hostname, rec);
   db.saveServer(rec);
+  pushHistory(rec, body);
   return { ok: true, action: 'registered', hostname };
 }
 

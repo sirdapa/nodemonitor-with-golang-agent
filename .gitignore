@@ -1,7 +1,9 @@
 node_modules
 data/
+agent/
 *.db
 *.db-wal
 *.db-shm
 .env
 .kilo
+.ai

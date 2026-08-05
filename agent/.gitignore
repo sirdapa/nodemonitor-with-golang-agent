@@ -1,7 +1,0 @@
-# Binary hasil build
-node-monitor-agent
-node-monitor-agent.exe
-*.exe
-
-# Go workspace
-vendor/
