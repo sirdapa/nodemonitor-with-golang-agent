@@ -1,56 +1,17 @@
 'use strict';
 
-/**
- * ============================================================================
- * src/store.js — In-memory store & business logic
- * ----------------------------------------------------------------------------
- * Map() sebagai cache baca cepat di atas SQLite.  Semua logic pembuatan,
- * update, serialisasi, dan perhitungan statistik server berada di sini.
- * ============================================================================
- */
-
-const { MAX_HISTORY, OFFLINE_TIMEOUT_MS, AUTH_TOKEN } = require('./config');
+// In-memory Map cache over SQLite + monitoring business logic.
+const { MAX_HISTORY, OFFLINE_TIMEOUT_MS } = require('./config');
 const db = require('./database');
+const crypto = require('crypto');
 
-/**
- * In-memory store keyed by hostname.  O(1) lookup/insert/delete.
- * @type {Map<string, Object>}
- */
 const servers = new Map();
 
-/* -------------------------------------------------------------------------- *
- *  Utility
- * -------------------------------------------------------------------------- */
+const nowMs = () => Date.now();
 
-/**
- * Return timestamp sekarang dalam milidetik.
- * @returns {number}
- */
-function nowMs() {
-  return Date.now();
-}
+// A server is stale when no report arrives within OFFLINE_TIMEOUT_MS.
+const isStale = (rec) => nowMs() - rec.lastSeen > OFFLINE_TIMEOUT_MS;
 
-/**
- * Apakah server sudah stale (tidak ada report dalam timeout)?
- *
- * @param {Object} rec - ServerRecord.
- * @returns {boolean}
- */
-function isStale(rec) {
-  return nowMs() - rec.lastSeen > OFFLINE_TIMEOUT_MS;
-}
-
-/* -------------------------------------------------------------------------- *
- *  Record lifecycle
- * -------------------------------------------------------------------------- */
-
-/**
- * Buat ServerRecord baru dari payload report agent.
- *
- * @param {Object} body - Body JSON dari /api/report.
- * @param {string} ip   - IP address agent.
- * @returns {Object} ServerRecord baru.
- */
 function createRecord(body, ip) {
   const ts = nowMs();
   return {
@@ -62,7 +23,7 @@ function createRecord(body, ip) {
     firstSeen: ts,
     lastSeen: ts,
     online: true,
-    cpu: body.cpu || { usage: 0 },
+    cpu: body.cpu || { name: '', usage: 0 },
     memory: body.memory || { used: 0, total: 0, percent: 0 },
     disk: body.disk || { used: 0, total: 0, percent: 0 },
     network: body.network || { rx: 0, tx: 0 },
@@ -71,15 +32,7 @@ function createRecord(body, ip) {
   };
 }
 
-/**
- * Update ServerRecord yang sudah ada dengan data report terbaru.
- * Hanya mengubah field yang ada di payload.
- *
- * @param {Object} rec  - ServerRecord yang akan diupdate.
- * @param {Object} body - Body JSON dari /api/report.
- * @param {string} ip   - IP address agent.
- * @returns {void}
- */
+// Update an existing record — only fields present in the payload.
 function updateRecord(rec, body, ip) {
   rec.lastSeen = nowMs();
   rec.online = true;
@@ -94,14 +47,7 @@ function updateRecord(rec, body, ip) {
   if (body.docker) rec.docker = body.docker;
 }
 
-/**
- * Push metric sample ke history array server, trim ke MAX_HISTORY terakhir,
- * dan persist ke SQLite.
- *
- * @param {Object} rec  - ServerRecord.
- * @param {Object} data - Raw payload dari agent.
- * @returns {void}
- */
+// Push a metric sample into history, trim to MAX_HISTORY, persist to SQLite.
 function pushHistory(rec, data) {
   const sample = {
     t: nowMs(),
@@ -118,12 +64,7 @@ function pushHistory(rec, data) {
   db.saveHistory(rec.hostname, sample);
 }
 
-/**
- * Serialisasi ServerRecord menjadi object JSON untuk API response.
- *
- * @param {Object} rec - ServerRecord.
- * @returns {Object}
- */
+// Serialize a ServerRecord for API responses.
 function serialize(rec) {
   return {
     hostname: rec.hostname,
@@ -144,16 +85,7 @@ function serialize(rec) {
   };
 }
 
-/* -------------------------------------------------------------------------- *
- *  Store operations
- * -------------------------------------------------------------------------- */
-
-/**
- * Muat data awal dari database ke in-memory Map.
- * Dipanggil sekali saat startup.
- *
- * @returns {void}
- */
+// Load data from DB into the Map — called once at startup.
 function loadFromDb() {
   const records = db.initDatabase();
   for (const rec of records) {
@@ -161,13 +93,7 @@ function loadFromDb() {
   }
 }
 
-/**
- * Proses incoming report: register server baru atau update yang ada.
- *
- * @param {Object} body - Body JSON dari /api/report.
- * @param {string} ip   - IP address agent.
- * @returns {{ ok: boolean, action: string, hostname: string }}
- */
+// Process an incoming report: register a new server or update an existing one.
 function processReport(body, ip) {
   const hostname = body.hostname.trim();
   const existing = servers.get(hostname);
@@ -186,11 +112,6 @@ function processReport(body, ip) {
   return { ok: true, action: 'registered', hostname };
 }
 
-/**
- * Ambil semua server sebagai array of serialized objects.
- *
- * @returns {Object[]}
- */
 function getAllServers() {
   const list = [];
   for (const rec of servers.values()) {
@@ -199,23 +120,12 @@ function getAllServers() {
   return list;
 }
 
-/**
- * Ambil satu server berdasarkan hostname.
- *
- * @param {string} hostname
- * @returns {Object|null} Serialized server atau null jika tidak ada.
- */
 function getServer(hostname) {
   const rec = servers.get(hostname);
   return rec ? serialize(rec) : null;
 }
 
-/**
- * Hapus server dari memory dan database.
- *
- * @param {string} hostname
- * @returns {boolean} true jika berhasil dihapus, false jika tidak ditemukan.
- */
+// Delete a server from memory + DB.
 function deleteServer(hostname) {
   if (!servers.has(hostname)) return false;
   servers.delete(hostname);
@@ -223,12 +133,7 @@ function deleteServer(hostname) {
   return true;
 }
 
-/**
- * Hitung statistik agregat semua server.
- * Average dihitung hanya dari server yang online.
- *
- * @returns {Object} { totalServers, onlineServers, offlineServers, avgCpu, avgRam }
- */
+// Aggregate stats — averages computed from online servers only.
 function computeStats() {
   let total = 0;
   let online = 0;
@@ -256,12 +161,7 @@ function computeStats() {
   };
 }
 
-/**
- * Sweep periodik: tandai server yang stale sebagai offline.
- * Status offline dipersist ke SQLite.
- *
- * @returns {void}
- */
+// Periodic sweep: mark stale servers as offline + persist to DB.
 function sweepOffline() {
   const now = nowMs();
   for (const rec of servers.values()) {
@@ -272,32 +172,31 @@ function sweepOffline() {
   }
 }
 
-/**
- * Jumlah server saat ini di memory.
- * @returns {number}
- */
-function serverCount() {
-  return servers.size;
-}
+const serverCount = () => servers.size;
 
-/* -------------------------------------------------------------------------- *
- *  Validation
- * -------------------------------------------------------------------------- */
-
-/**
- * Validasi body POST /api/report.  Return pesan error string jika invalid,
- * atau null jika valid.
- *
- * @param {Object} body - Body request.
- * @returns {string|null}
- */
+// Validate POST /api/report body. Returns an error string or null.
 function validateReport(body) {
   if (!body || typeof body !== 'object') {
     return 'Request body must be a JSON object.';
   }
-  if (!body.token || body.token !== AUTH_TOKEN) {
+  
+  const expected = db.getAgentToken();
+  if (!body.token || !expected) {
     return 'Invalid or missing authentication token.';
   }
+  
+  // Use timing-safe comparison if the token length matches (security against timing attacks)
+  if (body.token.length === expected.length) {
+    const bodyBuffer = Buffer.from(body.token, 'utf8');
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    if (!crypto.timingSafeEqual(bodyBuffer, expectedBuffer)) {
+      return 'Invalid or missing authentication token.';
+    }
+  } else {
+    // Length mismatch → invalid (no timing leak)
+    return 'Invalid or missing authentication token.';
+  }
+  
   if (!body.hostname || typeof body.hostname !== 'string' || body.hostname.trim() === '') {
     return 'hostname is required and must be a non-empty string.';
   }
@@ -316,12 +215,7 @@ function validateReport(body) {
   return null;
 }
 
-/**
- * Ekstrak IP client dari Express request, memperhitungkan proxy headers.
- *
- * @param {import('express').Request} req
- * @returns {string}
- */
+// Extract client IP, honoring proxy headers.
 function getClientIp(req) {
   const xf = req.headers['x-forwarded-for'];
   if (xf) {

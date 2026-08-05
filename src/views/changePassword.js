@@ -1,11 +1,6 @@
 'use strict';
 
-/**
- * ============================================================================
- * src/views/changePassword.js — Halaman ganti password (first login)
- * ============================================================================
- */
-
+// Change-password page (first login).
 const CHANGE_PASSWORD_HTML = `<!DOCTYPE html>
 <html lang="id" class="dark">
 <head>

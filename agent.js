@@ -1,44 +1,15 @@
 'use strict';
 
-/**
- * ============================================================================
- * agent.js — Contoh agent monitoring
- * ----------------------------------------------------------------------------
- * Agent Node.js yang menggunakan package `systeminformation` untuk
- * mengumpulkan metrik sistem dan POST ke dashboard setiap 10 detik.
- *
- * Cara pakai:
- *   npm install systeminformation
- *   TOKEN=changeme DASHBOARD_URL=http://your-dashboard:3000 node agent.js
- * ============================================================================
- */
-
+// Example Node.js agent (systeminformation) — collect metrics & POST every 10s.
+//   npm install systeminformation
+//   TOKEN=changeme DASHBOARD_URL=http://your-dashboard:3000 node agent.js
 const si = require('systeminformation');
 const os = require('os');
 
-/**
- * URL dashboard tujuan.
- * @type {string}
- */
 const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://localhost:3000';
-
-/**
- * Token autentikasi.
- * @type {string}
- */
 const TOKEN = process.env.TOKEN || 'changeme';
+const REPORT_INTERVAL_MS = 10 * 1000;
 
-/**
- * Interval pengiriman report (ms).
- * @type {number}
- */
-const REPORT_INTERVAL_MS = 10 * 1000; // 10 detik
-
-/**
- * Kumpulkan metrik sistem dan POST ke dashboard.
- *
- * @returns {Promise<void>}
- */
 async function collectAndReport() {
   try {
     const cpu = await si.currentLoad();
@@ -47,7 +18,7 @@ async function collectAndReport() {
     const net = await si.networkStats();
     const docker = await si.dockerContainers().catch(() => []);
 
-    // Ambil disk dan network interface pertama sebagai representasi.
+    // Use first disk and network interface as the representative.
     const d = disk[0] || { used: 0, size: 0, use: 0 };
     const n = net[0] || { rx_sec: 0, tx_sec: 0 };
 
@@ -90,6 +61,5 @@ async function collectAndReport() {
   }
 }
 
-// Kirim langsung, lalu setiap interval.
 collectAndReport();
 setInterval(collectAndReport, REPORT_INTERVAL_MS);

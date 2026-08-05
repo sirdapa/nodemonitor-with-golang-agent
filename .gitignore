@@ -1,9 +1,17 @@
-node_modules
+node_modules/
 data/
-agent/
 *.db
 *.db-wal
 *.db-shm
 .env
 .kilo
-.ai
+.ai/
+.github/
+agent/
+# Build artifacts
+*.exe
+agent/node-agent
+agent/node-agent.exe
+agent/node-monitor-agent
+agent/node-monitor-agent.exe
+agent/vendor/

@@ -1,20 +1,6 @@
 'use strict';
 
-/**
- * ============================================================================
- * src/routes/auth.js — Auth routes untuk dashboard
- * ----------------------------------------------------------------------------
- * Endpoint:
- *   GET  /login            → halaman login
- *   POST /login            → verifikasi password, buat session
- *   GET  /change-password  → halaman ganti password (wajib session)
- *   POST /change-password  → simpan password baru
- *   POST /logout           → hapus session
- *
- * Hanya melindungi halaman dashboard; API & /api/report tidak terpengaruh.
- * ============================================================================
- */
-
+// Auth routes: /login, /change-password, /logout. API & /api/report are unaffected.
 const express = require('express');
 const db = require('../database');
 const auth = require('../auth');
@@ -24,11 +10,7 @@ const router = express.Router();
 
 const MIN_PASSWORD_LENGTH = 6;
 
-/**
- * GET /login
- * Serve halaman login. Bila sudah punya session valid, lempar ke / atau
- * /change-password (bila masih wajib ganti password).
- */
+// Login page; redirect when already authenticated.
 router.get('/login', (req, res) => {
   const sess = auth.sessionFromRequest(req);
   if (sess) {
@@ -38,10 +20,7 @@ router.get('/login', (req, res) => {
   res.send(require('../views/login'));
 });
 
-/**
- * POST /login
- * Verifikasi password dashboard. Sukses → buat session + set cookie.
- */
+// Verify password, create session + cookie.
 router.post('/login', loginLimiter, (req, res) => {
   const password = req.body && typeof req.body.password === 'string' ? req.body.password : '';
   const storedHash = db.getSetting(db.SETTINGS.PASSWORD_HASH);
@@ -56,11 +35,7 @@ router.post('/login', loginLimiter, (req, res) => {
   res.json({ ok: true, mustChange });
 });
 
-/**
- * GET /change-password
- * Serve halaman ganti password. Wajib session; bila sudah tidak wajib ganti,
- * lempar ke dashboard.
- */
+// Change-password page (requires session + mustChange).
 router.get('/change-password', (req, res) => {
   const sess = auth.sessionFromRequest(req);
   if (!sess) return res.redirect('/login');
@@ -69,10 +44,7 @@ router.get('/change-password', (req, res) => {
   res.send(require('../views/changePassword'));
 });
 
-/**
- * POST /change-password
- * Validasi & simpan password baru, matikan flag must_change_password.
- */
+// Validate & save the new password, clear must_change_password.
 router.post('/change-password', (req, res) => {
   const sess = auth.sessionFromRequest(req);
   if (!sess) return res.status(401).json({ error: 'Tidak terautentikasi.' });
@@ -94,10 +66,7 @@ router.post('/change-password', (req, res) => {
   res.json({ ok: true });
 });
 
-/**
- * POST /logout
- * Hapus session & cookie, lalu redirect ke halaman login.
- */
+// Destroy session & cookie, redirect to /login.
 router.post('/logout', (req, res) => {
   auth.destroySession(auth.getCookie(req, auth.SESSION_COOKIE));
   res.clearCookie(auth.SESSION_COOKIE, { path: '/' });

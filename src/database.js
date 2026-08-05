@@ -1,57 +1,25 @@
 'use strict';
 
-/**
- * ============================================================================
- * src/database.js — Lapisan database SQLite
- * ----------------------------------------------------------------------------
- * Mengelola koneksi SQLite (node:sqlite — modul bawaan Node.js), schema,
- * prepared statements, dan operasi persistensi.  Semua query SQL dipusatkan
- * di sini.
- * ============================================================================
- */
-
+// SQLite via node:sqlite — schema, prepared statements, persistence.
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
-const { DB_PATH, MAX_HISTORY } = require('./config');
+const { DB_PATH, MAX_HISTORY, RAW_RETENTION_MS, ROLLUP_RETENTION_MS } = require('./config');
 const auth = require('./auth');
 
-/**
- * Default password untuk login dashboard pertama kali.
- * User akan dipaksa mengganti password setelah login pertama.
- * @type {string}
- */
+// Default password on first run — forced change after login.
 const DEFAULT_PASSWORD = '123456';
 
-/**
- * Key untuk tabel settings.
- */
 const SETTINGS = {
   PASSWORD_HASH: 'password_hash',
   MUST_CHANGE: 'must_change_password',
+  AGENT_TOKEN: 'agent_token',
 };
 
-/**
- * Koneksi database SQLite (synchronous API via node:sqlite).
- * @type {DatabaseSync}
- */
 let db;
-
-/**
- * Prepared statements yang dibuat sekali saat startup lalu dipakai berulang.
- */
 let stmts = {};
 
-/* -------------------------------------------------------------------------- *
- *  Schema helpers
- * -------------------------------------------------------------------------- */
-
-/**
- * Konversi row tabel `servers` menjadi object ServerRecord.
- *
- * @param {Object} row - Raw row dari tabel servers.
- * @returns {Object} ServerRecord.
- */
 function rowToRecord(row) {
   return {
     hostname: row.hostname,
@@ -71,12 +39,6 @@ function rowToRecord(row) {
   };
 }
 
-/**
- * Konversi row tabel `history` menjadi object MetricSample.
- *
- * @param {Object} row - Raw row dari tabel history.
- * @returns {Object} MetricSample.
- */
 function historyRowToSample(row) {
   return {
     t: row.t,
@@ -88,13 +50,7 @@ function historyRowToSample(row) {
   };
 }
 
-/**
- * JSON.parse yang aman — return fallback jika parsing gagal.
- *
- * @param {string} str      - JSON string dari DB.
- * @param {*}      fallback - Nilai default jika parse gagal.
- * @returns {*}
- */
+// Safe JSON.parse with fallback.
 function safeParse(str, fallback) {
   if (!str) return fallback;
   try {
@@ -104,18 +60,7 @@ function safeParse(str, fallback) {
   }
 }
 
-/* -------------------------------------------------------------------------- *
- *  Public API
- * -------------------------------------------------------------------------- */
-
-/**
- * Inisialisasi database: buat file & direktori, buat tabel, prepare
- * statements, dan return semua row servers untuk dimuat ke memory cache.
- *
- * @returns {Object[]} Array of ServerRecord dari DB (tanpa history).
- */
 function initDatabase() {
-  // Pastikan direktori parent ada.
   const dir = path.dirname(DB_PATH);
   if (dir && !fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -125,7 +70,6 @@ function initDatabase() {
   db.exec('PRAGMA journal_mode = WAL');
   db.exec('PRAGMA synchronous = NORMAL');
 
-  // --- Schema -------------------------------------------------------------
   db.exec(`
     CREATE TABLE IF NOT EXISTS servers (
       hostname    TEXT PRIMARY KEY,
@@ -157,13 +101,27 @@ function initDatabase() {
 
     CREATE INDEX IF NOT EXISTS idx_history_host ON history(hostname, id);
 
+    CREATE TABLE IF NOT EXISTS history_hourly (
+      hostname   TEXT NOT NULL,
+      bucket     INTEGER NOT NULL,
+      cpu        REAL,
+      mem_pct    REAL,
+      disk_pct   REAL,
+      rx         REAL,
+      tx         REAL,
+      samples    INTEGER,
+      PRIMARY KEY (hostname, bucket)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_hourly_host ON history_hourly(hostname, bucket);
+
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT
     );
   `);
 
-  // --- Prepared statements (node:sqlite uses positional ? params) -----
+  // Prepared statements use positional ? params (node:sqlite).
   stmts = {
     upsertServer: db.prepare(`
       INSERT INTO servers (hostname, os, platform, uptime, ip, first_seen, last_seen, online, cpu, memory, disk, network, docker)
@@ -187,12 +145,31 @@ function initDatabase() {
       ORDER BY id DESC
       LIMIT ?
     `),
-    trimHistory: db.prepare(`
-      DELETE FROM history
-      WHERE hostname = ?
-        AND id NOT IN (
-          SELECT id FROM history WHERE hostname = ? ORDER BY id DESC LIMIT ?
-        )
+    deleteOldHistory: db.prepare('DELETE FROM history WHERE t < ?'),
+    deleteHourlyHistory: db.prepare('DELETE FROM history_hourly WHERE hostname = ?'),
+    deleteOldHourly: db.prepare('DELETE FROM history_hourly WHERE bucket < ?'),
+    upsertHourly: db.prepare(`
+      INSERT INTO history_hourly (hostname, bucket, cpu, mem_pct, disk_pct, rx, tx, samples)
+      SELECT hostname, (t / 3600000) * 3600000 AS bucket,
+             AVG(cpu), AVG(mem_pct), AVG(disk_pct), AVG(rx), AVG(tx), COUNT(*)
+      FROM history
+      WHERE t < ?
+      GROUP BY hostname, bucket
+      ON CONFLICT(hostname, bucket) DO UPDATE SET
+        cpu=excluded.cpu, mem_pct=excluded.mem_pct, disk_pct=excluded.disk_pct,
+        rx=excluded.rx, tx=excluded.tx, samples=excluded.samples
+    `),
+    getHistoryRange: db.prepare(`
+      SELECT t, cpu, mem_pct AS memPct, disk_pct AS diskPct, rx, tx
+      FROM history
+      WHERE hostname = ? AND t >= ?
+      ORDER BY t ASC
+    `),
+    getHourlyRange: db.prepare(`
+      SELECT bucket AS t, cpu, mem_pct AS memPct, disk_pct AS diskPct, rx, tx
+      FROM history_hourly
+      WHERE hostname = ? AND bucket >= ?
+      ORDER BY bucket ASC
     `),
     setOffline: db.prepare('UPDATE servers SET online = 0 WHERE hostname = ?'),
     getSetting: db.prepare('SELECT value FROM settings WHERE key = ?'),
@@ -202,14 +179,13 @@ function initDatabase() {
     `),
   };
 
-  // --- Seed default credentials (hanya saat pertama kali) -------------------
   seedDefaultAuth();
+  seedAgentToken();
 
-  // --- Load semua server dari DB ------------------------------------------
   const rows = db.prepare('SELECT * FROM servers').all();
   const records = rows.map(rowToRecord);
 
-  // Muat history untuk setiap server.
+  // Load history per server (newest first, reversed to chronological).
   for (const rec of records) {
     const hRows = stmts.getHistory.all(rec.hostname, MAX_HISTORY);
     rec.history = hRows.reverse().map(historyRowToSample);
@@ -218,12 +194,7 @@ function initDatabase() {
   return records;
 }
 
-/**
- * Persist ServerRecord ke database (upsert).
- *
- * @param {Object} rec - ServerRecord yang akan disimpan.
- * @returns {void}
- */
+// Persist a ServerRecord (upsert).
 function saveServer(rec) {
   stmts.upsertServer.run(
     rec.hostname,
@@ -242,14 +213,8 @@ function saveServer(rec) {
   );
 }
 
-/**
- * Simpan metric sample ke tabel history dan trim entry lama agar hanya
- * menyimpan MAX_HISTORY baris terbaru per server.
- *
- * @param {string} hostname - Hostname server.
- * @param {Object} sample   - MetricSample yang akan disimpan.
- * @returns {void}
- */
+// Insert a metric sample into raw history.
+// Trimming of old raw data is done by maintenance job, not on every insert.
 function saveHistory(hostname, sample) {
   stmts.insertHistory.run(
     hostname,
@@ -260,73 +225,147 @@ function saveHistory(hostname, sample) {
     sample.rx,
     sample.tx
   );
-  stmts.trimHistory.run(hostname, hostname, MAX_HISTORY);
 }
 
-/**
- * Hapus server beserta seluruh history-nya dari database.
- *
- * @param {string} hostname - Hostname server yang akan dihapus.
- * @returns {void}
- */
-function deleteServerFromDb(hostname) {
-  stmts.deleteHistory.run(hostname);
-  stmts.deleteServer.run(hostname);
-}
-
-/**
- * Tandai server sebagai offline di database.
- *
- * @param {string} hostname - Hostname server.
- * @returns {void}
- */
+// Mark a server as offline.
 function setOfflineInDb(hostname) {
   stmts.setOffline.run(hostname);
 }
 
-/**
- * Seed kredensial default saat database pertama kali dibuat:
- *   - hash password default (123456)
- *   - flag must_change_password = '1' (paksa ganti password pertama login)
- *
- * @returns {void}
- */
+// Seed default credentials on first run:
+//   - hash of default password (123456)
+//   - must_change_password = '1' (force password change on first login)
 function seedDefaultAuth() {
   const existing = stmts.getSetting.get(SETTINGS.PASSWORD_HASH);
-  if (existing) return; // sudah pernah di-seed / diubah
+  if (existing) return;
   stmts.setSetting.run(SETTINGS.PASSWORD_HASH, auth.hashPassword(DEFAULT_PASSWORD));
   stmts.setSetting.run(SETTINGS.MUST_CHANGE, '1');
 }
 
-/**
- * Ambil nilai setting berdasarkan key.
- *
- * @param {string} key
- * @returns {string|null}
- */
+// Generate a cryptographically secure random token for agent authentication.
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Seed the agent token in database if it doesn't exist.
+// Uses env TOKEN if set and not the default 'changeme', otherwise generates a new token.
+function seedAgentToken() {
+  const existing = getSetting(SETTINGS.AGENT_TOKEN);
+  if (existing) return;
+
+  let token;
+  const envToken = process.env.TOKEN;
+  if (envToken && envToken !== 'changeme') {
+    token = envToken;
+  } else {
+    token = generateToken();
+  }
+  setSetting(SETTINGS.AGENT_TOKEN, token);
+}
+
+// Get the current agent token from database.
+function getAgentToken() {
+  return getSetting(SETTINGS.AGENT_TOKEN);
+}
+
+// Regenerate the agent token and return the new one.
+function regenerateAgentToken() {
+  const newToken = generateToken();
+  setSetting(SETTINGS.AGENT_TOKEN, newToken);
+  return newToken;
+}
+
 function getSetting(key) {
   const row = stmts.getSetting.get(key);
   return row ? row.value : null;
 }
 
-/**
- * Simpan / update nilai setting.
- *
- * @param {string} key
- * @param {string} value
- * @returns {void}
- */
 function setSetting(key, value) {
   stmts.setSetting.run(key, value);
 }
 
-/**
- * Tutup koneksi database.
- *
- * @returns {void}
- */
 function closeDatabase() {
   if (db) db.close();
+}
+
+// Maintenance job: prune old raw history data.
+function pruneRawHistory() {
+  try {
+    stmts.deleteOldHistory.run(Date.now() - RAW_RETENTION_MS);
+  } catch (err) {
+    console.error('Error pruning raw history:', err);
+  }
+}
+
+// Maintenance job: roll up raw history to hourly aggregations.
+function rollupHistory() {
+  try {
+    const now = Date.now();
+    const cutoff = now - (now % 3600000); // Start of current hour, roll up only completed hours
+    stmts.upsertHourly.run(cutoff);
+  } catch (err) {
+    console.error('Error rolling up history:', err);
+  }
+}
+
+// Maintenance job: prune old hourly data.
+function pruneRollup() {
+  try {
+    stmts.deleteOldHourly.run(Date.now() - ROLLUP_RETENTION_MS);
+  } catch (err) {
+    console.error('Error pruning rollup data:', err);
+  }
+}
+
+// Run all maintenance jobs.
+function runMaintenance() {
+  try {
+    rollupHistory();
+    pruneRawHistory();
+    pruneRollup();
+  } catch (err) {
+    console.error('Maintenance job failed:', err);
+  }
+}
+
+// Get historical data for a server within a time range.
+function getHistoryRange(hostname, sinceMs, useRollup) {
+  let rows;
+  if (useRollup) {
+    rows = stmts.getHourlyRange.all(hostname, sinceMs);
+  } else {
+    rows = stmts.getHistoryRange.all(hostname, sinceMs);
+  }
+  
+  // Downsample if too many points for performance
+  if (rows.length > 500) {
+    return downsample(rows, 500);
+  }
+  return rows;
+}
+
+// Downsample array of data points to maximum number of points
+function downsample(rows, maxPoints) {
+  if (!rows || rows.length === 0) return [];
+  if (rows.length <= maxPoints) return rows;
+  
+  const step = Math.ceil(rows.length / maxPoints);
+  const downsampled = [];
+  for (let i = 0; i < rows.length; i += step) {
+    downsampled.push(rows[i]);
+  }
+  // Always include the latest data point to avoid losing most recent data
+  if (!downsampled.length || rows[rows.length - 1].t !== downsampled[downsampled.length - 1].t) {
+    downsampled.push(rows[rows.length - 1]);
+  }
+  return downsampled;
+}
+
+// Delete a server and all its history (raw + hourly rollup).
+function deleteServerFromDb(hostname) {
+  stmts.deleteHistory.run(hostname);
+  stmts.deleteHourlyHistory.run(hostname);
+  stmts.deleteServer.run(hostname);
 }
 
 module.exports = {
@@ -336,7 +375,12 @@ module.exports = {
   deleteServerFromDb,
   setOfflineInDb,
   closeDatabase,
+  runMaintenance,
+  getHistoryRange,
   seedDefaultAuth,
+  seedAgentToken,
+  getAgentToken,
+  regenerateAgentToken,
   getSetting,
   setSetting,
   SETTINGS,

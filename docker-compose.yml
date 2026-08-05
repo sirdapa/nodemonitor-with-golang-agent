@@ -1,21 +1,16 @@
-# ============================================================================
-# docker-compose.yml — Node Monitor (Dashboard + Agent)
-# ----------------------------------------------------------------------------
-# Menjalankan dashboard monitoring dan satu atau lebih agent Go.
+# Node Monitor (Dashboard + Agent)
+# Usage:
+#   docker compose up -d              # start everything
+#   docker compose up -d monitor      # dashboard only
+#   docker compose up -d agent        # agent only
+#   docker compose logs -f monitor    # dashboard logs
+#   docker compose down               # stop everything
 #
-# Cara pakai:
-#   docker compose up -d              # start semua
-#   docker compose up -d monitor      # start dashboard saja
-#   docker compose up -d agent        # start agent saja
-#   docker compose logs -f monitor    # lihat log dashboard
-#   docker compose down               # stop semua
-#
-# Untuk menambah agent baru, copy block service "agent" dan ubah
-# hostname-nya. Lihat contoh "agent-02" di bawah (commented).
-# ============================================================================
+# To add another agent, duplicate the "agent" service block and change
+# its hostname. See the "agent-02" example below (commented out).
 
 services:
-  # --- Dashboard Server ----------------------------------------------------
+  # --- Dashboard Server ---
   monitor:
     build:
       context: .
@@ -24,7 +19,7 @@ services:
     ports:
       - "${MONITOR_PORT:-3000}:3000"
     volumes:
-      # Persist SQLite database ke host agar data tidak hilang saat container dihapus.
+      # Persist SQLite database to the host so data survives container removal.
       - monitor-data:/app/data
     environment:
       - PORT=3000
@@ -38,7 +33,7 @@ services:
       start_period: 10s
       retries: 3
 
-  # --- Agent 01 ------------------------------------------------------------
+  # --- Agent 01 ---
   agent:
     build:
       context: ./agent
@@ -55,8 +50,8 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # --- Agent 02 (contoh agent tambahan) -----------------------------------
-  # Uncomment untuk menjalankan agent kedua dengan hostname berbeda.
+  # --- Agent 02 (example of an additional agent) ---
+  # Uncomment to run a second agent with a different hostname.
   # agent-02:
   #   build:
   #     context: ./agent
@@ -73,7 +68,7 @@ services:
   #       condition: service_healthy
   #   restart: unless-stopped
 
-# --- Volumes ---------------------------------------------------------------
+# --- Volumes ---
 volumes:
   monitor-data:
-    # Persisted SQLite database untuk dashboard.
+    # Persisted SQLite database for the dashboard.

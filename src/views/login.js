@@ -1,11 +1,6 @@
 'use strict';
 
-/**
- * ============================================================================
- * src/views/login.js — Halaman login dashboard
- * ============================================================================
- */
-
+// Dashboard login page.
 const LOGIN_HTML = `<!DOCTYPE html>
 <html lang="id" class="dark">
 <head>

@@ -1,14 +1,5 @@
 'use strict';
 
-/**
- * ============================================================================
- * src/middleware.js — Setup middleware Express
- * ----------------------------------------------------------------------------
- * Semua konfigurasi middleware (security, CORS, compression, logging,
- * rate limiting) dipusatkan di sini.
- * ============================================================================
- */
-
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
@@ -16,19 +7,10 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
-/**
- * Pasang semua middleware ke Express app.
- *
- * @param {import('express').Express} app - Instance Express.
- * @returns {void}
- */
 function setupMiddleware(app) {
-  // --- Body parsing ---
   app.use(express.json({ limit: '64kb' }));
 
-  // --- Security headers ---
-  // Relax beberapa default helmet agar inline <script>/<style> di dashboard
-  // tetap berfungsi.
+  // Relaxed CSP to allow inline <script>/<style> and CDNs.
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -40,25 +22,22 @@ function setupMiddleware(app) {
             'https://cdn.tailwindcss.com',
             'https://cdn.jsdelivr.net',
           ],
+          // Inline event handlers are intentionally blocked; use addEventListener.
+          scriptSrcAttr: ["'none'"],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
           imgSrc: ["'self'", 'data:'],
-          connectSrc: ["'self'"],
+          connectSrc: ["'self'", 'https://cdn.jsdelivr.net'],
           fontSrc: ["'self'", 'https://cdn.jsdelivr.net'],
         },
       },
     })
   );
 
-  // --- CORS ---
   app.use(cors());
-
-  // --- Compression ---
   app.use(compression());
-
-  // --- Request logging ---
   app.use(morgan('tiny'));
 
-  // --- Rate limiting (global) ---
+  // Global rate limit: 300 req/min.
   const globalLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 300,
@@ -69,10 +48,7 @@ function setupMiddleware(app) {
   app.use(globalLimiter);
 }
 
-/**
- * Rate limiter khusus untuk dashboard page (lebih ketat).
- * @type {import('express-rate-limit').RateLimitRequestHandler}
- */
+// Dashboard page rate limiter: 120 req/min.
 const dashboardLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
@@ -81,10 +57,7 @@ const dashboardLimiter = rateLimit({
   message: 'Too many dashboard requests.',
 });
 
-/**
- * Rate limiter ketat untuk endpoint login — cegah brute-force password.
- * @type {import('express-rate-limit').RateLimitRequestHandler}
- */
+// Login rate limiter: 10 req/min — brute-force protection.
 const loginLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,

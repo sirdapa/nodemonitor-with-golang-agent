@@ -1,21 +1,12 @@
 'use strict';
 
-/**
- * ============================================================================
- * src/views/dashboard.js — HTML template untuk dashboard
- * ----------------------------------------------------------------------------
- * Seluruh HTML, CSS (Tailwind), dan client-side JavaScript untuk dashboard
- * single-page.  Tidak ada file eksternal — semuanya embedded di template
- * string ini.
- * ============================================================================
- */
-
+// Dashboard HTML template — Tailwind + Chart.js via CDN, all client JS inline.
 const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Node Monitor — VPS Dashboard</title>
+  <title>NodeWatcher</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
@@ -77,20 +68,6 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         <span id="lastRefresh" class="text-xs text-gray-500 hidden sm:inline"></span>
         <span id="refreshDot" class="w-2 h-2 rounded-full bg-green-500 pulse-online"></span>
         <span class="text-xs text-gray-400">Live</span>
-        <div class="flex items-center gap-2 ml-1">
-          <span class="text-xs text-gray-500 hidden lg:inline">Endpoint:</span>
-          <code id="agentEndpoint" class="text-xs text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1 font-mono max-w-[200px] truncate" title="">…</code>
-          <button id="copyEndpoint" type="button" title="Salin endpoint agent"
-            class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
-            Salin
-          </button>
-          <span class="text-xs text-gray-500 hidden lg:inline">Token:</span>
-          <code id="agentToken" class="text-xs text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1 font-mono max-w-[160px] truncate select-all" title="__AGENT_TOKEN__">__AGENT_TOKEN__</code>
-          <button id="copyToken" type="button" title="Salin token agent"
-            class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
-            Salin
-          </button>
-        </div>
         <form method="POST" action="/logout" class="ml-1">
           <button type="submit" title="Logout"
             class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
@@ -169,26 +146,54 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     </section>
 
     <!-- ---- Controls ---- -->
-    <section class="flex flex-col sm:flex-row sm:items-center gap-3">
-      <div class="relative flex-1">
-        <svg class="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
-        </svg>
-        <input id="searchBox" type="text" placeholder="Search hostname or OS…"
-          class="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+    <section class="space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+        <div class="min-w-0">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500 mb-1">Endpoint</p>
+          <div class="flex items-center gap-2 min-w-0">
+            <code id="agentEndpoint" class="flex-1 text-xs text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1 font-mono truncate" title="">…</code>
+            <button id="copyEndpoint" type="button" title="Copy agent endpoint"
+              class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
+              Copy
+            </button>
+          </div>
+        </div>
+        <div class="min-w-0">
+          <p class="text-[10px] uppercase tracking-[0.25em] text-gray-500 mb-1">Token</p>
+          <div class="flex items-center gap-2 min-w-0">
+            <code id="agentToken" class="flex-1 text-xs text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1 font-mono truncate select-all" title="">__AGENT_TOKEN__</code>
+            <button id="copyToken" type="button" title="Copy agent token"
+              class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
+              Copy
+            </button>
+            <button id="refreshToken" type="button" title="Regenerate agent token"
+              class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
+              Refresh
+            </button>
+          </div>
+        </div>
       </div>
-      <select id="sortBy"
-        class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-        <option value="hostname">Sort: Hostname</option>
-        <option value="cpu">Sort: CPU</option>
-        <option value="ram">Sort: RAM</option>
-        <option value="disk">Sort: Disk</option>
-        <option value="lastSeen">Sort: Last Seen</option>
-      </select>
-      <div class="flex bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-        <button data-filter="all"    class="filter-btn px-4 py-2.5 text-sm font-medium text-white bg-brand-600">All</button>
-        <button data-filter="online" class="filter-btn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-white">Online</button>
-        <button data-filter="offline" class="filter-btn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-white">Offline</button>
+      <div class="flex flex-col lg:flex-row lg:items-center gap-3">
+        <div class="relative flex-1">
+          <svg class="w-5 h-5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/>
+          </svg>
+          <input id="searchBox" type="text" placeholder="Search hostname or OS…"
+            class="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent" />
+        </div>
+        <select id="sortBy"
+          class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <option value="hostname">Sort: Hostname</option>
+          <option value="cpu">Sort: CPU</option>
+          <option value="ram">Sort: RAM</option>
+          <option value="disk">Sort: Disk</option>
+          <option value="lastSeen">Sort: Last Seen</option>
+        </select>
+        <div class="flex bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+          <button data-filter="all"    class="filter-btn px-4 py-2.5 text-sm font-medium text-white bg-brand-600">All</button>
+          <button data-filter="online" class="filter-btn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-white">Online</button>
+          <button data-filter="offline" class="filter-btn px-4 py-2.5 text-sm font-medium text-gray-400 hover:text-white">Offline</button>
+        </div>
       </div>
     </section>
 
@@ -226,14 +231,14 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
   <!-- ============================ MODAL ============================= -->
   <div id="detailModal" class="fixed inset-0 z-50 hidden">
-    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div id="modalOverlay" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
     <div class="absolute inset-y-0 right-0 w-full max-w-2xl bg-gray-850 bg-gray-900 border-l border-gray-700 shadow-2xl overflow-y-auto">
       <div class="sticky top-0 bg-gray-900 border-b border-gray-700 px-6 py-4 flex items-center justify-between z-10">
         <div>
           <h2 id="modalTitle" class="text-lg font-bold text-white"></h2>
           <p id="modalSubtitle" class="text-xs text-gray-500"></p>
         </div>
-        <button onclick="closeModal()" class="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800">
+        <button id="modalCloseBtn" class="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
           </svg>
@@ -253,15 +258,14 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     let currentFilter = 'all';
     let currentSort = 'hostname';
     let currentSearch = '';
-    let charts = {};   // { hostname: { cpu: Chart, ram: Chart } }
+    let charts = {};   // { cpu: Chart, ram: Chart, disk: Chart }
+    var modalRefreshInterval = null;
+    var modalHostname = null;
+    var currentRange = '24h';
 
     /* ----------------------- Helpers ----------------------- */
 
-    /**
-     * Format bytes into a human-readable string.
-     * @param {number} bytes
-     * @returns {string}
-     */
+    // Format bytes into a human-readable string.
     function fmtBytes(bytes) {
       if (!bytes || bytes <= 0) return '0 B';
       const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
@@ -269,11 +273,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
     }
 
-    /**
-     * Format seconds into a compact uptime string.
-     * @param {number} sec
-     * @returns {string}
-     */
+    // Format seconds into a compact uptime string.
     function fmtUptime(sec) {
       if (!sec || sec <= 0) return '—';
       const d = Math.floor(sec / 86400);
@@ -284,11 +284,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       return m + 'm';
     }
 
-    /**
-     * Format a timestamp into a relative "time ago" string.
-     * @param {number} ts - Unix timestamp in ms.
-     * @returns {string}
-     */
+    // Format a timestamp into a relative "time ago" string (ts in ms).
     function timeAgo(ts) {
       const diff = Math.floor((Date.now() - ts) / 1000);
       if (diff < 5) return 'just now';
@@ -298,21 +294,13 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       return Math.floor(diff / 86400) + 'd ago';
     }
 
-    /**
-     * Format a timestamp as a local date-time string.
-     * @param {number} ts
-     * @returns {string}
-     */
+    // Format a timestamp as a local date-time string.
     function fmtDate(ts) {
       if (!ts) return '—';
       return new Date(ts).toLocaleString();
     }
 
-    /**
-     * Return a Tailwind colour class for a usage percentage bar.
-     * @param {number} pct
-     * @returns {string}
-     */
+    // Tailwind colour class for a usage percentage bar.
     function barColor(pct) {
       if (pct >= 90) return 'bg-red-500';
       if (pct >= 75) return 'bg-orange-500';
@@ -320,11 +308,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       return 'bg-green-500';
     }
 
-    /**
-     * Escape HTML to prevent XSS when inserting user-controlled data.
-     * @param {string} str
-     * @returns {string}
-     */
+    // Escape HTML to prevent XSS when inserting user-controlled data.
     function esc(str) {
       if (str === null || str === undefined) return '';
       return String(str)
@@ -335,12 +319,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         .replace(/'/g, '&#39;');
     }
 
-    /**
-     * Build a small usage bar with a label.
-     * @param {number} pct   - Percentage 0-100.
-     * @param {string} label - Label text.
-     * @returns {string} HTML string.
-     */
+    // Build a small usage bar with a label.
     function usageBar(pct, label) {
       pct = Math.max(0, Math.min(100, pct || 0));
       return ''
@@ -357,10 +336,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
     /* ----------------------- Data fetching ----------------------- */
 
-    /**
-     * Fetch all servers and stats from the API, then re-render.
-     * @returns {Promise<void>}
-     */
+    // Fetch all servers and stats from the API, then re-render.
     async function fetchData() {
       try {
         const [srvRes, statRes] = await Promise.all([
@@ -379,11 +355,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
     /* ----------------------- Rendering: stat cards ----------------------- */
 
-    /**
-     * Render the top summary cards.  Only the numeric values are updated
-     * in-place so the cards do not flash / re-animate on every refresh.
-     * @param {Object} stats
-     */
+    // Render the top summary cards. Only numbers are updated in-place.
     function renderStats(stats) {
       document.getElementById('statTotal').textContent = stats.totalServers;
       document.getElementById('statOnline').textContent = stats.onlineServers;
@@ -394,10 +366,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
     /* ----------------------- Rendering: table ----------------------- */
 
-    /**
-     * Apply current filter / search / sort to the server list and render
-     * the table rows.
-     */
+    // Apply current filter / search / sort and render the table rows.
     function renderTable() {
       let list = allServers.slice();
 
@@ -455,7 +424,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
           : '<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400"><span class="w-2 h-2 rounded-full bg-red-500"></span>Offline</span>';
 
         return ''
-          + '<tr class="border-b border-gray-700/50 hover:bg-gray-800/60 cursor-pointer transition-colors" onclick="openModal(\\'' + esc(s.hostname) + '\\')">'
+          + '<tr class="border-b border-gray-700/50 hover:bg-gray-800/60 cursor-pointer transition-colors" data-hostname="' + esc(s.hostname) + '">'
           +   '<td class="px-4 py-3">'
           +     '<svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>'
           +   '</td>'
@@ -484,11 +453,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
     /* ----------------------- Modal / detail panel ----------------------- */
 
-    /**
-     * Open the detail modal for a given hostname and render its contents
-     * including charts.
-     * @param {string} hostname
-     */
+    // Open the detail modal for a hostname and render contents including charts.
     window.openModal = function (hostname) {
       var s = allServers.find(function (x) { return x.hostname === hostname; });
       if (!s) return;
@@ -515,6 +480,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
         /* --- Metric grid --- */
         + '<div class="grid grid-cols-2 gap-3">'
+        +   metricCard('CPU Name', s.cpu ? (s.cpu.name || 'Unknown') : 'Unknown', 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M9 9h6v6H9z')
         +   metricCard('Network RX', fmtBytes(s.network ? s.network.rx : 0), 'M4 16l4-4 4 4 4-4 4 4')
         +   metricCard('Network TX', fmtBytes(s.network ? s.network.tx : 0), 'M4 8l4 4 4-4 4 4 4-4')
         +   metricCard('Docker Containers', (s.docker ? s.docker.containers : 0) + ' total · ' + (s.docker ? s.docker.running : 0) + ' running', 'M20 7l-8-4-8 4 8 4 8-4zM4 7v10l8 4 8-4V7')
@@ -526,12 +492,25 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         /* --- Charts --- */
         + '<div class="grid grid-cols-1 gap-4">'
         +   '<div class="bg-gray-800/50 border border-gray-700 rounded-xl p-4">'
-        +     '<h3 class="text-sm font-medium text-white mb-3">CPU History</h3>'
+        +     '<div class="flex items-center justify-between mb-3">'
+        +       '<h3 class="text-sm font-medium text-white">CPU History</h3>'
+        +       '<div class="flex gap-1">'
+        +         '<button class="range-btn px-2 py-1 text-xs font-medium text-gray-400 hover:text-white rounded" data-range="today">Today</button>'
+        +         '<button class="range-btn px-2 py-1 text-xs font-medium text-white bg-brand-600 rounded" data-range="24h">24H</button>'
+        +         '<button class="range-btn px-2 py-1 text-xs font-medium text-gray-400 hover:text-white rounded" data-range="7d">7D</button>'
+        +         '<button class="range-btn px-2 py-1 text-xs font-medium text-gray-400 hover:text-white rounded" data-range="30d">30D</button>'
+        +         '<button class="range-btn px-2 py-1 text-xs font-medium text-gray-400 hover:text-white rounded" data-range="60d">60D</button>'
+        +       '</div>'
+        +     '</div>'
         +     '<div style="height:180px"><canvas id="cpuChart"></canvas></div>'
         +   '</div>'
         +   '<div class="bg-gray-800/50 border border-gray-700 rounded-xl p-4">'
         +     '<h3 class="text-sm font-medium text-white mb-3">RAM History</h3>'
         +     '<div style="height:180px"><canvas id="ramChart"></canvas></div>'
+        +   '</div>'
+        +   '<div class="bg-gray-800/50 border border-gray-700 rounded-xl p-4">'
+        +     '<h3 class="text-sm font-medium text-white mb-3">Disk Usage History</h3>'
+        +     '<div style="height:180px"><canvas id="diskChart"></canvas></div>'
         +   '</div>'
         + '</div>'
 
@@ -543,17 +522,61 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
 
       document.getElementById('modalBody').innerHTML = body;
 
+      // Reset range state to default
+      currentRange = '24h';
+      
       // Build charts after DOM is updated.
       requestAnimationFrame(function () { buildCharts(s); });
+
+      // Start realtime chart refresh.
+      modalHostname = hostname;
+      modalRefreshInterval = setInterval(refreshModalData, 3000);
     };
 
-    /**
-     * Produce a small metric card HTML string.
-     * @param {string} label
-     * @param {string} value
-     * @param {string} iconPath
-     * @returns {string}
-     */
+    // Fetch fresh data for the open modal and update charts in-place.
+    async function refreshModalData() {
+      if (!modalHostname) return;
+      try {
+        // Use current range for data loading
+        loadRangeData(modalHostname, currentRange);
+      } catch (e) {
+        console.error('Modal refresh error:', e);
+      }
+    }
+
+    // Load historical data for a specific time range
+    async function loadRangeData(hostname, range) {
+      try {
+        var res = await fetch('/api/server/' + encodeURIComponent(hostname) + '/history?range=' + encodeURIComponent(range));
+        var data = await res.json();
+        
+        if (data.error) {
+          console.error('Error loading history:', data.error);
+          return;
+        }
+        
+        var points = data.points;
+        var labels = points.map(function (p) {
+          // Format labels based on range
+          if (range === 'today' || range === '24h') {
+            return new Date(p.t).toLocaleTimeString();
+          } else {
+            return new Date(p.t).toLocaleDateString();
+          }
+        });
+        var cpuData = points.map(function (p) { return p.cpu; });
+        var ramData = points.map(function (p) { return p.memPct; });
+        var diskData = points.map(function (p) { return p.diskPct; });
+        
+        if (charts.cpu) { charts.cpu.data.labels = labels; charts.cpu.data.datasets[0].data = cpuData; charts.cpu.update('none'); }
+        if (charts.ram) { charts.ram.data.labels = labels; charts.ram.data.datasets[0].data = ramData; charts.ram.update('none'); }
+        if (charts.disk) { charts.disk.data.labels = labels; charts.disk.data.datasets[0].data = diskData; charts.disk.update('none'); }
+      } catch (e) {
+        console.error('Error loading range data:', e);
+      }
+    }
+
+    // Produce a small metric card HTML string.
     function metricCard(label, value, iconPath) {
       return ''
         + '<div class="bg-gray-800/50 border border-gray-700 rounded-xl p-4">'
@@ -569,23 +592,19 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         + '</div>';
     }
 
-    /**
-     * Close the detail modal and destroy any charts it contained.
-     */
+    // Close the detail modal and destroy any charts it contained.
     window.closeModal = function () {
+      if (modalRefreshInterval) { clearInterval(modalRefreshInterval); modalRefreshInterval = null; }
+      modalHostname = null;
       document.getElementById('detailModal').classList.add('hidden');
       // Destroy charts to free canvas / memory.
-      Object.keys(charts).forEach(function (k) {
-        if (charts[k].cpu) { charts[k].cpu.destroy(); }
-        if (charts[k].ram) { charts[k].ram.destroy(); }
-      });
+      if (charts.cpu) { charts.cpu.destroy(); }
+      if (charts.ram) { charts.ram.destroy(); }
+      if (charts.disk) { charts.disk.destroy(); }
       charts = {};
     };
 
-    /**
-     * Build CPU and RAM history charts inside the modal.
-     * @param {Object} s - Server record.
-     */
+    // Build CPU / RAM / Disk history charts inside the modal.
     function buildCharts(s) {
       var labels = s.history.map(function (h) {
         return new Date(h.t).toLocaleTimeString();
@@ -641,6 +660,28 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         },
         options: baseOpts,
       });
+
+      var diskCtx = document.getElementById('diskChart');
+      if (!diskCtx) return;
+
+      var diskData = s.history.map(function (h) { return h.diskPct; });
+
+      charts.disk = new Chart(diskCtx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Disk %',
+            data: diskData,
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168,85,247,.15)',
+            fill: true,
+            tension: 0.35,
+            borderWidth: 2,
+          }],
+        },
+        options: baseOpts,
+      });
     }
 
     /* ----------------------- Event listeners ----------------------- */
@@ -674,7 +715,54 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       if (e.key === 'Escape') closeModal();
     });
 
-    // Isi endpoint agent dari URL akses saat ini (bekerja lewat tunnel).
+    // Close modal on overlay click.
+    var modalOverlay = document.getElementById('modalOverlay');
+    if (modalOverlay) {
+      modalOverlay.addEventListener('click', closeModal);
+    }
+
+    // Close modal on close button click.
+    var modalCloseBtn = document.getElementById('modalCloseBtn');
+    if (modalCloseBtn) {
+      modalCloseBtn.addEventListener('click', closeModal);
+    }
+
+    // Event delegation for range buttons in modal.
+    var modalBody = document.getElementById('modalBody');
+    if (modalBody) {
+      modalBody.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest('.range-btn') : null;
+        if (!btn) return;
+        
+        var range = btn.getAttribute('data-range');
+        if (!range) return;
+        
+        // Update active style
+        var allBtns = modalBody.querySelectorAll('.range-btn');
+        allBtns.forEach(function (b) {
+          b.classList.remove('bg-brand-600', 'text-white');
+          b.classList.add('text-gray-400');
+        });
+        btn.classList.add('bg-brand-600', 'text-white');
+        btn.classList.remove('text-gray-400');
+        
+        // Update state and reload data
+        currentRange = range;
+        loadRangeData(modalHostname, range);
+      });
+    }
+
+    // Event delegation for table row clicks (hostname data attribute).
+    var serverTableBody = document.getElementById('serverTableBody');
+    if (serverTableBody) {
+      serverTableBody.addEventListener('click', function (e) {
+        var target = e.target;
+        var row = target && target.closest ? target.closest('tr[data-hostname]') : null;
+        if (row) openModal(row.getAttribute('data-hostname'));
+      });
+    }
+
+    // Fill the agent endpoint from the current URL (works behind a tunnel).
     var endpointEl = document.getElementById('agentEndpoint');
     if (endpointEl) {
       var endpoint = (window.location.origin || '') + '/api/report';
@@ -682,11 +770,11 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       endpointEl.title = endpoint;
     }
 
-    // Helper salin teks ke clipboard.
+    // Copy text to clipboard.
     function copyText(btn, text) {
       var done = function () {
         var prev = btn.textContent;
-        btn.textContent = 'Tersalin!';
+        btn.textContent = 'Copied!';
         setTimeout(function () { btn.textContent = prev; }, 1500);
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -696,7 +784,7 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       }
     }
 
-    // Salin token agent.
+    // Copy token to clipboard.
     var copyTokenBtn = document.getElementById('copyToken');
     if (copyTokenBtn) {
       copyTokenBtn.addEventListener('click', function () {
@@ -704,7 +792,45 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
       });
     }
 
-    // Salin endpoint agent.
+    // Regenerate agent token (requires user confirmation).
+    var refreshTokenBtn = document.getElementById('refreshToken');
+    if (refreshTokenBtn) {
+      refreshTokenBtn.addEventListener('click', function () {
+        if (!confirm('Regenerate agent token? All connected agents will lose access and must use the new token.')) {
+          return;
+        }
+        
+        refreshTokenBtn.disabled = true;
+        refreshTokenBtn.textContent = 'Refreshing...';
+        
+        fetch('/api/token/refresh', {
+          method: 'POST',
+          credentials: 'same-origin'
+        })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Failed to refresh token');
+          return res.json();
+        })
+        .then(function (data) {
+          var tokenEl = document.getElementById('agentToken');
+          tokenEl.textContent = data.token;
+          tokenEl.title = data.token;
+          refreshTokenBtn.textContent = 'Refreshed!';
+          setTimeout(function () {
+            refreshTokenBtn.textContent = 'Refresh';
+          }, 1500);
+        })
+        .catch(function (err) {
+          console.error('Token refresh failed:', err);
+          refreshTokenBtn.textContent = 'Refresh';
+        })
+        .finally(function () {
+          refreshTokenBtn.disabled = false;
+        });
+      });
+    }
+
+    // Copy endpoint to clipboard.
     var copyEndpointBtn = document.getElementById('copyEndpoint');
     if (copyEndpointBtn) {
       copyEndpointBtn.addEventListener('click', function () {
