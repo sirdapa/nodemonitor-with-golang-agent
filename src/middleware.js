@@ -81,7 +81,20 @@ const dashboardLimiter = rateLimit({
   message: 'Too many dashboard requests.',
 });
 
+/**
+ * Rate limiter ketat untuk endpoint login — cegah brute-force password.
+ * @type {import('express-rate-limit').RateLimitRequestHandler}
+ */
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Terlalu banyak percobaan login. Coba lagi nanti.' },
+});
+
 module.exports = {
   setupMiddleware,
   dashboardLimiter,
+  loginLimiter,
 };

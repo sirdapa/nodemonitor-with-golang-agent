@@ -13,6 +13,7 @@ const express = require('express');
 const { setupMiddleware } = require('./middleware');
 const apiRoutes = require('./routes/api');
 const dashboardRoutes = require('./routes/dashboard');
+const authRoutes = require('./routes/auth');
 
 /**
  * Buat dan konfigurasi Express application.
@@ -24,6 +25,10 @@ function createApp() {
 
   // Pasang semua middleware (security, CORS, compression, logging, rate limit).
   setupMiddleware(app);
+
+  // Auth routes (login, change-password, logout) — harus sebelum dashboard
+  // agar halaman /login & /change-password bisa diakses tanpa session.
+  app.use('/', authRoutes);
 
   // REST API routes.
   app.use('/api', apiRoutes);
