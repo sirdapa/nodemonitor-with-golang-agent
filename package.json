@@ -7,7 +7,11 @@
     "start": "node --experimental-sqlite index.js",
     "dev": "node --experimental-sqlite index.js",
     "agent": "node --experimental-sqlite agent.js",
-    "tunnel": "cloudflared tunnel --url http://127.0.0.1:${PORT:-3000} --no-autoupdate"
+    "tunnel": "cloudflared tunnel --url http://127.0.0.1:${PORT:-3000} --no-autoupdate",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:migrate": "wrangler d1 migrations apply node-monitor --remote",
+    "cf:migrate:local": "wrangler d1 migrations apply node-monitor --local"
   },
   "keywords": [
     "monitoring",
@@ -24,6 +28,10 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
     "localtunnel": "^2.0.2",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "hono": "^4.6.3"
+  },
+  "devDependencies": {
+    "wrangler": "^3.78.0"
   }
 }

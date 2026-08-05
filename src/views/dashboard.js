@@ -60,8 +60,8 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
           </svg>
         </div>
         <div>
-          <h1 class="text-lg font-bold text-white leading-tight">Node Monitor</h1>
-          <p class="text-xs text-gray-500">VPS Monitoring Dashboard</p>
+          <h1 class="text-lg font-bold text-white leading-tight">NodeWatcher</h1>
+          <p class="text-xs text-gray-500">Node Monitoring Dashboard</p>
         </div>
       </div>
       <div class="flex items-center gap-3">

@@ -1,0 +1,23 @@
+# Node Monitor Cloudflare Worker Configuration
+name = "node-monitor"
+main = "worker/index.js"
+
+[build]
+command = "npm install && npm install -D wrangler"
+
+[compatibility_date]
+date = "2024-09-23"
+
+[compatibility_flags]
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "node-monitor"
+database_id = "<REPLACE_WITH_YOUR_D1_DATABASE_ID>"  # TODO: Replace with your actual D1 database ID
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[observability]
+enabled = true

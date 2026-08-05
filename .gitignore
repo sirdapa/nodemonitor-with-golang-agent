@@ -15,3 +15,11 @@ agent/node-agent.exe
 agent/node-monitor-agent
 agent/node-monitor-agent.exe
 agent/vendor/
+
+# Cloudflare Workers
+.wrangler/
+worker/
+migrations/
+
+# Docker artifacts
+.dockerignore
