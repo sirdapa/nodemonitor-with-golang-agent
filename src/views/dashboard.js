@@ -77,6 +77,26 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
         <span id="lastRefresh" class="text-xs text-gray-500 hidden sm:inline"></span>
         <span id="refreshDot" class="w-2 h-2 rounded-full bg-green-500 pulse-online"></span>
         <span class="text-xs text-gray-400">Live</span>
+        <div class="flex items-center gap-2 ml-1">
+          <span class="text-xs text-gray-500 hidden lg:inline">Endpoint:</span>
+          <code id="agentEndpoint" class="text-xs text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1 font-mono max-w-[200px] truncate" title="">…</code>
+          <button id="copyEndpoint" type="button" title="Salin endpoint agent"
+            class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
+            Salin
+          </button>
+          <span class="text-xs text-gray-500 hidden lg:inline">Token:</span>
+          <code id="agentToken" class="text-xs text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1 font-mono max-w-[160px] truncate select-all" title="__AGENT_TOKEN__">__AGENT_TOKEN__</code>
+          <button id="copyToken" type="button" title="Salin token agent"
+            class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
+            Salin
+          </button>
+        </div>
+        <form method="POST" action="/logout" class="ml-1">
+          <button type="submit" title="Logout"
+            class="text-xs font-medium text-gray-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors">
+            Logout
+          </button>
+        </form>
       </div>
     </div>
   </header>
@@ -653,6 +673,44 @@ const DASHBOARD_HTML = `<!DOCTYPE html>
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') closeModal();
     });
+
+    // Isi endpoint agent dari URL akses saat ini (bekerja lewat tunnel).
+    var endpointEl = document.getElementById('agentEndpoint');
+    if (endpointEl) {
+      var endpoint = (window.location.origin || '') + '/api/report';
+      endpointEl.textContent = endpoint;
+      endpointEl.title = endpoint;
+    }
+
+    // Helper salin teks ke clipboard.
+    function copyText(btn, text) {
+      var done = function () {
+        var prev = btn.textContent;
+        btn.textContent = 'Tersalin!';
+        setTimeout(function () { btn.textContent = prev; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(done);
+      } else {
+        done();
+      }
+    }
+
+    // Salin token agent.
+    var copyTokenBtn = document.getElementById('copyToken');
+    if (copyTokenBtn) {
+      copyTokenBtn.addEventListener('click', function () {
+        copyText(copyTokenBtn, document.getElementById('agentToken').textContent);
+      });
+    }
+
+    // Salin endpoint agent.
+    var copyEndpointBtn = document.getElementById('copyEndpoint');
+    if (copyEndpointBtn) {
+      copyEndpointBtn.addEventListener('click', function () {
+        copyText(copyEndpointBtn, document.getElementById('agentEndpoint').textContent);
+      });
+    }
 
     /* ----------------------- Init ----------------------- */
 

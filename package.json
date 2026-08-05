@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --experimental-sqlite index.js",
     "dev": "node --experimental-sqlite index.js",
-    "agent": "node --experimental-sqlite agent.js"
+    "agent": "node --experimental-sqlite agent.js",
+    "tunnel": "cloudflared tunnel --url http://127.0.0.1:${PORT:-3000} --no-autoupdate"
   },
   "keywords": [
     "monitoring",
@@ -22,6 +23,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
+    "localtunnel": "^2.0.2",
     "morgan": "^1.10.0"
   }
 }
